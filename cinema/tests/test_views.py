@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from cinema.models import Movie, Genre, Actor
-from cinema.serializers import MovieSerializer, MovieListSerializer
+from cinema.serializers import MovieListSerializer
 
 
 MOVIE_URL = reverse("cinema:movie-list")
