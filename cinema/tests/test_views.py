@@ -1,3 +1,7 @@
+import os
+import tempfile
+
+from PIL import Image
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -6,7 +10,7 @@ from rest_framework.test import APIClient
 
 from cinema.models import Movie, Genre, Actor
 from cinema.serializers import MovieListSerializer
-
+from cinema.tests.test_movie_api import image_upload_url
 
 MOVIE_URL = reverse("cinema:movie-list")
 
@@ -49,10 +53,22 @@ class UnauthenticatedMovieApiTests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
+        self.movie = sample_movie()
 
     def test_auth_required(self):
         """Test that authentication is required"""
         res = self.client.get(MOVIE_URL)
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_unauthenticated_upload_image_to_movie(self):
+        """Test uploading an image to movie"""
+        url = image_upload_url(self.movie.id)
+        with tempfile.NamedTemporaryFile(suffix=".jpg") as ntf:
+            img = Image.new("RGB", (10, 10))
+            img.save(ntf, format="JPEG")
+            ntf.seek(0)
+            res = self.client.post(url, {"image": ntf}, format="multipart")
+        self.movie.refresh_from_db()
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
@@ -225,6 +241,7 @@ class AdminMovieApiTests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
+        self.movie = sample_movie()
         self.user = get_user_model().objects.create_user(
             email="admin@test.com",
             password="testpass123",
@@ -252,3 +269,15 @@ class AdminMovieApiTests(TestCase):
         self.assertEqual(movie.duration, payload["duration"])
         self.assertIn(genre, movie.genres.all())
         self.assertIn(actor, movie.actors.all())
+
+    def test_admin_upload_image_to_movie(self):
+        """Test uploading an image to movie"""
+        url = image_upload_url(self.movie.id)
+        with tempfile.NamedTemporaryFile(suffix=".jpg") as ntf:
+            img = Image.new("RGB", (10, 10))
+            img.save(ntf, format="JPEG")
+            ntf.seek(0)
+            res = self.client.post(url, {"image": ntf}, format="multipart")
+        self.movie.refresh_from_db()
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
